@@ -54,7 +54,11 @@
   "last_sync_at",
   "status",
   "column_break_status",
-  "last_sync_status"
+  "last_sync_status",
+  "export_filters_json",
+  "child_image_field",
+  "parent_image_field",
+  "fallback_image_field"
  ],
  "fields": [
   {
@@ -146,12 +150,12 @@
    "options": "OpenImmo"
   },
   {
-   "default": "VOLL",
+   "default": "TEIL",
    "depends_on": "eval:doc.operation_type=='Export'",
    "fieldname": "transfer_scope",
    "fieldtype": "Select",
    "label": "Transfer Scope",
-   "options": "VOLL\nTEIL"
+   "options": "TEIL\nVOLL"
   },
   {
    "default": "NEW",
@@ -412,7 +416,7 @@
    "link_fieldname": "source_name"
   }
  ],
- "modified": "2026-02-22 10:41:50.765842",
+ "modified": "2026-05-02 10:01:47.869749",
  "modified_by": "Administrator",
  "module": "Openimmo Propms",
  "name": "Integration Source",
