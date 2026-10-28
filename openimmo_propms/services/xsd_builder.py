@@ -56,9 +56,57 @@ class XSDDrivenBuilder:
 		immobilie_schema = self.schema.elements["immobilie"]
 		for prop_data in data_map:
 			immobilie_node = etree.SubElement(anbieter, "immobilie")
-			self._fill_element(immobilie_node, immobilie_schema, prop_data)
+			if prop_data.get("__action__") == "DELETE":
+				self._build_minimal_delete_immobilie(immobilie_node, prop_data, anbieter_context)
+			else:
+				self._fill_element(immobilie_node, immobilie_schema, prop_data)
 
 		return etree.tostring(root, pretty_print=True, xml_declaration=True, encoding="UTF-8").decode("utf-8")
+
+	def _build_minimal_delete_immobilie(self, immobilie_node, prop_data, anbieter_context):
+		"""Build minimal XSD-valid immobilie node for DELETE action."""
+		# objektkategorie
+		objektkategorie = etree.SubElement(immobilie_node, "objektkategorie")
+		etree.SubElement(
+			objektkategorie,
+			"nutzungsart",
+			WOHNEN="true",
+			GEWERBE="false",
+			ANLAGE="false",
+			WAZ="false",
+		)
+		etree.SubElement(
+			objektkategorie,
+			"vermarktungsart",
+			KAUF="false",
+			MIETE_PACHT="true",
+		)
+		objektart = etree.SubElement(objektkategorie, "objektart")
+		etree.SubElement(objektart, "wohnung")
+
+		# geo
+		geo = etree.SubElement(immobilie_node, "geo")
+		ort = etree.SubElement(geo, "ort")
+		ort.text = prop_data.get("geo.ort") or "Berlin"
+
+		# kontaktperson
+		kontaktperson = etree.SubElement(immobilie_node, "kontaktperson")
+		email = etree.SubElement(kontaktperson, "email_direkt")
+		email.text = anbieter_context.get("contact_email") or "info@example.com"
+		name = etree.SubElement(kontaktperson, "name")
+		name.text = anbieter_context.get("firma") or "Admin"
+
+		# verwaltung_techn
+		verwaltung_techn = etree.SubElement(immobilie_node, "verwaltung_techn")
+		obid = prop_data.get("verwaltung_techn.openimmo_obid") or prop_data.get("objektnr_intern") or "NO-OBID"
+		objektnr_extern = etree.SubElement(verwaltung_techn, "objektnr_extern")
+		objektnr_extern.text = obid
+		etree.SubElement(verwaltung_techn, "aktion", aktionart="DELETE")
+		openimmo_obid = etree.SubElement(verwaltung_techn, "openimmo_obid")
+		openimmo_obid.text = obid
+		stand_vom = etree.SubElement(verwaltung_techn, "stand_vom")
+		from frappe.utils import nowdate
+		stand_vom.text = nowdate()
 
 	def _build_uebertragung(self, root, portal_name, transfer_scope, transfer_mode, version):
 		from frappe.utils import now_datetime

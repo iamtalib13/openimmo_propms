@@ -37,6 +37,7 @@ frappe.ui.form.on("Integration Job", {
 		// Modern HTML Cards for Processing Summary
 		const total = frm.doc.total_records || 0;
 		const success = frm.doc.successful_records || 0;
+		const deleted = frm.doc.deleted_records || 0;
 		const skipped = frm.doc.skipped_records || 0;
 		const failed = frm.doc.failed_records || 0;
 
@@ -49,6 +50,10 @@ frappe.ui.form.on("Integration Job", {
 				<div style="flex: 1; min-width: 120px; padding: 12px; border-radius: 8px; background: #fff; border: 1px solid #d1d8dd; border-bottom: 4px solid #28a745; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
 					<div style="font-size: 1.4em; font-weight: bold; color: #28a745;">${success}</div>
 					<div style="font-size: 0.85em; color: #666; font-weight: 500;">Success</div>
+				</div>
+				<div style="flex: 1; min-width: 120px; padding: 12px; border-radius: 8px; background: #fff; border: 1px solid #d1d8dd; border-bottom: 4px solid #6c757d; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+					<div style="font-size: 1.4em; font-weight: bold; color: #6c757d;">${deleted}</div>
+					<div style="font-size: 0.85em; color: #666; font-weight: 500;">Deleted</div>
 				</div>
 				<div style="flex: 1; min-width: 120px; padding: 12px; border-radius: 8px; background: #fff; border: 1px solid #d1d8dd; border-bottom: 4px solid #ffa00a; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
 					<div style="font-size: 1.4em; font-weight: bold; color: #ffa00a;">${skipped}</div>

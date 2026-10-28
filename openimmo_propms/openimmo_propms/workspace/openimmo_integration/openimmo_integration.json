@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"Q8L1zXPnCn\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">OpenImmo Integration</span>\",\"col\":12}},{\"id\":\"o7KRK4kQZ0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Source\",\"col\":3}},{\"id\":\"uYtkexF5PI\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Job\",\"col\":3}},{\"id\":\"dbmZ_gpPi6\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Quick Filters</span>\",\"col\":12}},{\"id\":\"nOB09kpqnu\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Active Sources\",\"col\":4}},{\"id\":\"RHLPdRAmh8\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Jobs\",\"col\":4}},{\"id\":\"pTNsYKHZ1K\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Failed Jobs\",\"col\":4}}]",
+ "content": "[{\"id\":\"Q8L1zXPnCn\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">OpenImmo Integration</span>\",\"col\":12}},{\"id\":\"o7KRK4kQZ0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Source\",\"col\":3}},{\"id\":\"uYtkexF5PI\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Integration Job\",\"col\":3}},{\"id\":\"mAlwo0o7nv\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Portal Listing\",\"col\":3}},{\"id\":\"dbmZ_gpPi6\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Quick Filters</span>\",\"col\":12}},{\"id\":\"nOB09kpqnu\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Active Sources\",\"col\":4}},{\"id\":\"RHLPdRAmh8\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Recent Jobs\",\"col\":4}},{\"id\":\"pTNsYKHZ1K\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"Failed Jobs\",\"col\":4}}]",
  "creation": "2025-12-12 20:40:07.270824",
  "custom_blocks": [],
  "docstatus": 0,
@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "Openimmo Integration",
  "links": [],
- "modified": "2026-02-16 18:21:34.971902",
+ "modified": "2026-10-28 20:46:24.568913",
  "modified_by": "Administrator",
  "module": "Openimmo Propms",
  "name": "Openimmo Integration",
@@ -45,6 +45,14 @@
  ],
  "sequence_id": 376.0,
  "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Portal Listing",
+   "link_to": "Portal Listing",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
   {
    "color": "Blue",
    "doc_view": "List",

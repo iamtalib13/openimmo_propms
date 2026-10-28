@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 openimmo_propms.patches.custom_fields.openimmo_custom_fields_Crm_Lead
 openimmo_propms.patches.convert_property_fields_to_int
+openimmo_propms.patches.seed_portal_listings_from_job_history

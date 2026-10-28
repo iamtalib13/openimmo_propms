@@ -24,6 +24,7 @@
     "processed_at",
     "column_break_4",
     "successful_records",
+    "deleted_records",
     "skipped_records",
     "failed_records",
     "section_break_4",
@@ -138,6 +139,13 @@
       "fieldname": "successful_records",
       "fieldtype": "Int",
       "label": "Successful Records",
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "fieldname": "deleted_records",
+      "fieldtype": "Int",
+      "label": "Deleted Records",
       "read_only": 1
     },
     {

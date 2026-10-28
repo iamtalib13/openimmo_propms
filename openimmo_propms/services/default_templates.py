@@ -364,12 +364,12 @@ OPENIMMO_JINJA_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
                 <verwaltung_techn>
                     <objektnr_intern>{{ (doc.name[2:] if (doc.name or "").startswith("E-") else (doc.name or "")) }}</objektnr_intern>
                     <objektnr_extern>{{ (doc.name[2:] if (doc.name or "").startswith("E-") else (doc.name or "")) }}</objektnr_extern>
-                    <aktion aktionart="{{ source.transfer_mode }}"/>
+                    <aktion aktionart="{{ rec.action or source.transfer_mode or 'CHANGE' }}"/>
                     {%- if doc.custom_available_from -%}
                     <aktiv_von>{{ doc.custom_available_from or "" }}</aktiv_von>
                     {%- endif -%}
                     <openimmo_obid>{{ (doc.name[2:] if (doc.name or "").startswith("E-") else (doc.name or "")) }}</openimmo_obid>
-                    <stand_vom>{{ doc.modified.strftime('%Y-%m-%d') }}</stand_vom>
+                    <stand_vom>{{ doc.modified.strftime('%Y-%m-%d') if doc.modified else frappe.utils.nowdate() }}</stand_vom>
                 </verwaltung_techn>
             </immobilie>
         {%- endfor -%}

@@ -29,38 +29,126 @@ _OPENIMMO_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "x
 
 def run_export(source_name, **kwargs):
 	"""Run a metadata-driven export without touching the import flow."""
+	run_started = frappe.utils.now()
 	try:
 		source = frappe.get_doc("Integration Source", source_name)
 		_validate_export_source(source)
 
-		records = _get_records_for_export(source, kwargs)
-		records, blocked = evaluate_quality_gate_for_export(source, records)
-		skipped_records = len(blocked)
-		if not records:
-			if frappe.job:
-				source.db_set("last_sync_status", "Success (No modifications)")
-				source.db_set("last_sync_at", frappe.utils.now())
-				return {
-					"status": "success",
-					"record_count": 0,
-					"skipped_records": skipped_records,
-					"blocked_records": blocked,
-					"skipped": len(blocked),
-					"message": "No properties found to export.",
-				}
-			else:
-				frappe.throw(_("No properties found matching the configured export filters."))
-		mapped_records = [build_property_data(source, record) for record in records]
+		is_teil = (source.transfer_scope or "").upper() == "TEIL"
+		if is_teil:
+			records = _get_records_for_export(source, kwargs, strip_modified=True)
+			records, blocked = evaluate_quality_gate_for_export(source, records)
+			skipped_records = len(blocked)
 
-		# Inject transfer_mode into each record for dynamic Aktion mapping
-		transfer_mode = source.transfer_mode
-		if not transfer_mode:
-			frappe.throw("Mandatory field 'Transfer Mode' is missing in Integration Source configuration.")
-		for record in mapped_records:
-			record["verwaltung_techn.aktion"] = transfer_mode
-			record["verwaltung_techn.aktion@aktionart"] = transfer_mode
-			if not record.get("verwaltung_techn.openimmo_obid"):
-				record["verwaltung_techn.openimmo_obid"] = record.get("objektnr_intern", "NO-OBID")
+			# O = Online listings for this source
+			online_listings = frappe.get_all(
+				"Portal Listing",
+				filters={"source": source.name, "state": "Online"},
+				fields=["name", "property", "obid"],
+			)
+			online_map = {l["property"]: l for l in online_listings}
+			online_prop_names = set(online_map.keys())
+			target_prop_names = {r["name"] for r in records}
+
+			last_sync_at = source.last_sync_at
+			# change = {T where modified > last_sync_at} ∪ (T - O)
+			change_records = []
+			for r in records:
+				if r["name"] not in online_prop_names:
+					change_records.append(r)
+				elif not last_sync_at:
+					change_records.append(r)
+				elif r.get("modified") and frappe.utils.get_datetime(r["modified"]) > frappe.utils.get_datetime(last_sync_at):
+					change_records.append(r)
+
+			# delete = O - T
+			delete_prop_names = online_prop_names - target_prop_names
+			delete_listings = [online_map[p] for p in delete_prop_names]
+
+			if not change_records and not delete_listings:
+				if frappe.job:
+					source.db_set("last_sync_status", "Success (No modifications)")
+					source.db_set("last_sync_at", run_started)
+					return {
+						"status": "success",
+						"record_count": 0,
+						"skipped_records": skipped_records,
+						"blocked_records": blocked,
+						"skipped": len(blocked),
+						"message": "No changes or deletions to export.",
+					}
+				else:
+					frappe.throw(_("No changes or deletions found matching export criteria."))
+
+			# Build mapped records for changes
+			mapped_records = []
+			active_records_to_sync = []
+			for record in change_records:
+				mapped = build_property_data(source, record)
+				mapped["__action__"] = "CHANGE"
+				mapped["verwaltung_techn.aktion"] = "CHANGE"
+				mapped["verwaltung_techn.aktion@aktionart"] = "CHANGE"
+				if not mapped.get("verwaltung_techn.openimmo_obid"):
+					mapped["verwaltung_techn.openimmo_obid"] = mapped.get("objektnr_intern", record.get("name"))
+				mapped_records.append(mapped)
+				active_records_to_sync.append((record["name"], mapped["verwaltung_techn.openimmo_obid"]))
+
+			# Build minimal records for deletes
+			delete_records_data = []
+			for l in delete_listings:
+				del_doc = frappe._dict({
+					"name": l["property"],
+					"custom_property_name": l["property"],
+					"modified": frappe.utils.now_datetime(),
+				})
+				delete_records_data.append(del_doc)
+				del_mapped = {
+					"__action__": "DELETE",
+					"verwaltung_techn.aktion": "DELETE",
+					"verwaltung_techn.aktion@aktionart": "DELETE",
+					"verwaltung_techn.openimmo_obid": l["obid"],
+					"objektnr_intern": l["obid"],
+					"objektnr_extern": l["obid"],
+				}
+				mapped_records.append(del_mapped)
+
+			export_all_records = change_records + delete_records_data
+			deleted_count = len(delete_listings)
+			deleted_to_sync = [(l["property"], l["obid"]) for l in delete_listings]
+		else:
+			records = _get_records_for_export(source, kwargs)
+			records, blocked = evaluate_quality_gate_for_export(source, records)
+			skipped_records = len(blocked)
+			if not records:
+				if frappe.job:
+					source.db_set("last_sync_status", "Success (No modifications)")
+					source.db_set("last_sync_at", run_started)
+					return {
+						"status": "success",
+						"record_count": 0,
+						"skipped_records": skipped_records,
+						"blocked_records": blocked,
+						"skipped": len(blocked),
+						"message": "No properties found to export.",
+					}
+				else:
+					frappe.throw(_("No properties found matching the configured export filters."))
+
+			transfer_mode = source.transfer_mode or "CHANGE"
+			mapped_records = []
+			for record in records:
+				mapped = build_property_data(source, record)
+				mapped["__action__"] = transfer_mode
+				mapped["verwaltung_techn.aktion"] = transfer_mode
+				mapped["verwaltung_techn.aktion@aktionart"] = transfer_mode
+				if not mapped.get("verwaltung_techn.openimmo_obid"):
+					mapped["verwaltung_techn.openimmo_obid"] = mapped.get("objektnr_intern", "NO-OBID")
+				mapped_records.append(mapped)
+
+			export_all_records = records
+			deleted_count = 0
+			active_records_to_sync = [(r["name"], mapped["verwaltung_techn.openimmo_obid"]) for r, mapped in zip(records, mapped_records, strict=False)]
+			deleted_to_sync = []
 
 		anbieter_id = kwargs.get("anbieter_id") or source.anbieter_id
 
@@ -82,12 +170,10 @@ def run_export(source_name, **kwargs):
 			if not is_valid:
 				frappe.throw(_("Generated XML is not compliant with XSD: {0}").format(error_msg))
 
-			# For simplicity in the existing batch flow, we pack it into a 'documents' list structure
-			# (Though XSD builder currently returns the whole doc, we adapt it)
 			all_image_urls = []
 			if cint(getattr(source, "send_as_zip", 0)):
 				seen = set()
-				for record in records:
+				for record in export_all_records:
 					for url in _collect_image_urls(source, record):
 						if url not in seen:
 							all_image_urls.append(url)
@@ -97,13 +183,15 @@ def run_export(source_name, **kwargs):
 				{
 					"filename": _build_batch_filename(source),
 					"xml_content": _normalize_xml_document(xml_content),
-					"record_count": len(records),
+					"record_count": len(export_all_records),
+					"deleted_records": deleted_count,
 					"image_urls": all_image_urls,
 				}
 			]
 		else:
-			export_records = list(zip(records, mapped_records, strict=False))
-			documents = _build_export_documents(source, export_records, kwargs)
+			documents = _build_export_documents(source, list(zip(export_all_records, mapped_records, strict=False)), kwargs)
+			for doc_item in documents:
+				doc_item["deleted_records"] = deleted_count
 
 			# Validate Jinja-rendered OpenImmo XML against XSD
 			if source.export_format == "OpenImmo" and getattr(source, "use_jinja_template", 0):
@@ -133,6 +221,7 @@ def run_export(source_name, **kwargs):
 			response = {
 				"status": "success",
 				"record_count": document["record_count"],
+				"deleted_records": document.get("deleted_records", 0),
 				"total_records": document["record_count"] + skipped_for_job,
 				"skipped_records": skipped_for_job,
 				"blocked_records": blocked if not responses else [],
@@ -154,12 +243,23 @@ def run_export(source_name, **kwargs):
 			job = _create_export_job(source, response)
 			response["job_name"] = job.name
 
+			# Successful delivery: upsert Portal Listing state
+			if response.get("delivery_status") != "failed":
+				_persist_portal_listings_state(
+					source.name,
+					source.target_doctype or "Property",
+					active_records_to_sync,
+					deleted_to_sync,
+					job.name,
+					run_started,
+				)
+
 			responses.append(response)
 
 		summary = _summarize_export_response(source, responses)
 
 		# Update last sync time and status for all successful runs
-		source.db_set("last_sync_at", frappe.utils.now())
+		source.db_set("last_sync_at", run_started)
 		if source.source_type != "FTP" or not cint(source.ftp_transfer_enabled):
 			source.db_set("last_sync_status", "Export completed")
 
@@ -167,6 +267,52 @@ def run_export(source_name, **kwargs):
 	except Exception as e:
 		frappe.logger("openimmo_export").error(f"Export failed for {source_name}: {e!s}")
 		raise e
+
+
+def _persist_portal_listings_state(source_name, target_doctype, active_records, deleted_records, job_name, run_started):
+	"""Upsert Portal Listing records after successful export delivery."""
+	for prop_name, obid in active_records:
+		listing_name = f"{source_name}-{prop_name}"
+		if frappe.db.exists("Portal Listing", listing_name):
+			frappe.db.set_value(
+				"Portal Listing",
+				listing_name,
+				{
+					"obid": obid,
+					"state": "Online",
+					"last_action": "CHANGE",
+					"last_sent_at": run_started,
+					"last_job": job_name,
+				},
+			)
+		else:
+			doc = frappe.get_doc({
+				"doctype": "Portal Listing",
+				"source": source_name,
+				"property_doctype": target_doctype,
+				"property": prop_name,
+				"obid": obid,
+				"state": "Online",
+				"last_action": "CHANGE",
+				"last_sent_at": run_started,
+				"last_job": job_name,
+			})
+			doc.flags.ignore_links = True
+			doc.insert(ignore_permissions=True)
+
+	for prop_name, obid in deleted_records:
+		listing_name = f"{source_name}-{prop_name}"
+		if frappe.db.exists("Portal Listing", listing_name):
+			frappe.db.set_value(
+				"Portal Listing",
+				listing_name,
+				{
+					"state": "Withdrawn",
+					"last_action": "DELETE",
+					"last_sent_at": run_started,
+					"last_job": job_name,
+				},
+			)
 
 
 def _validate_export_source(source):
@@ -290,10 +436,12 @@ def _build_jinja_xml(source, export_records, params):
 	For batch mode: template receives all_records list and loops internally.
 	For single mode: template receives doc (single record).
 	"""
+	change_records = [(r, m) for r, m in export_records if m.get("__action__") != "DELETE"]
+	delete_records = [(r, m) for r, m in export_records if m.get("__action__") == "DELETE"]
+
 	if source.record_packaging == "Separate XML per Record":
-		# Each record rendered separately - template gets single doc
 		parts = []
-		for record, mapped_record in export_records:
+		for record, mapped_record in change_records:
 			_validate_single_hero_image(record)
 			context = {
 				"doc": record,
@@ -308,12 +456,25 @@ def _build_jinja_xml(source, export_records, params):
 
 	# Batch mode - template gets all_records list for looping
 	all_records = []
-	for record, mapped_record in export_records:
+	for record, mapped_record in change_records:
 		_validate_single_hero_image(record)
+		if isinstance(record.get("modified"), str):
+			record["modified"] = frappe.utils.get_datetime(record["modified"])
 		all_records.append({"doc": record, "mapped": mapped_record})
+
+	delete_context = [
+		{
+			"objektnr_intern": str(m.get("objektnr_intern", "")),
+			"objektnr_extern": str(m.get("objektnr_extern", "")),
+			"openimmo_obid": str(m.get("verwaltung_techn.openimmo_obid", "")),
+		}
+		for _, m in delete_records
+	]
 
 	context = {
 		"all_records": all_records,
+		"delete_records": delete_context,
+		"doc": frappe._dict({}),
 		"source": source,
 		"frappe": frappe,
 	}
@@ -377,8 +538,8 @@ def _build_record_filename(source, index):
 	return f"{source.name.lower().replace(' ', '_')}_{_export_format_slug(source)}_export_{index}.xml"
 
 
-def _get_records_for_export(source, params):
-	filters = _get_configured_export_filters(source)
+def _get_records_for_export(source, params, strip_modified=False):
+	filters = _get_configured_export_filters(source, strip_modified=strip_modified)
 	fieldnames = _sanitize_query_fields(_get_requested_fieldnames(source))
 	runtime_filters = {}
 
@@ -412,7 +573,7 @@ def _get_records_for_export(source, params):
 	return [frappe._dict(record) for record in records]
 
 
-def _get_configured_export_filters(source):
+def _get_configured_export_filters(source, strip_modified=False):
 	filters_json = (source.export_filters_json or "").strip()
 	if not filters_json:
 		return {}
@@ -440,12 +601,23 @@ def _get_configured_export_filters(source):
 	rendered_json = frappe.render_template(filters_json, context)
 
 	parsed_filters = frappe.parse_json(rendered_json)
+	res = {}
 	if isinstance(parsed_filters, list):
-		return _normalize_list_filters(parsed_filters)
-	if isinstance(parsed_filters, dict):
-		return dict(parsed_filters)
+		res = _normalize_list_filters(parsed_filters)
+	elif isinstance(parsed_filters, dict):
+		res = dict(parsed_filters)
+	else:
+		frappe.throw(_("Export Filters (JSON) must be a JSON object or list"))
 
-	frappe.throw(_("Export Filters (JSON) must be a JSON object or list"))
+	if strip_modified:
+		if isinstance(res, dict):
+			res = {k: v for k, v in res.items() if not (isinstance(k, str) and "modified" in k.lower())}
+		elif isinstance(res, list):
+			res = [
+				item for item in res
+				if not (isinstance(item, (list, tuple)) and len(item) >= 1 and isinstance(item[0], str) and "modified" in item[0].lower())
+			]
+	return res
 
 
 def _merge_filters(configured_filters, runtime_filters):
@@ -994,6 +1166,7 @@ def _create_export_job(source, response):
 			"processed_at": frappe.utils.now(),
 			"total_records": total_records,
 			"successful_records": successful_records,
+			"deleted_records": response.get("deleted_records", 0),
 			"failed_records": 0,
 			"skipped_records": skipped_records,
 			"log_message": _build_export_log_message(response),
@@ -1009,10 +1182,15 @@ def _build_export_log_message(response):
 	delivery_status = response.get("delivery_status", "generated")
 	delivery_channel = response.get("delivery_channel", "Manual")
 	skipped_count = len(response.get("blocked_records", [])) or response.get("skipped_records", 0)
+	deleted_count = response.get("deleted_records", 0)
+	record_count = response.get("record_count", 0)
+	change_count = max(0, record_count - deleted_count)
 	return _(
-		"Export completed. Records: {0}, Skipped (Quality Gate): {1}, Delivery: {2}, Channel: {3}"
+		"Export completed. Records: {0} (CHANGE: {1}, DELETE: {2}), Skipped: {3}, Delivery: {4}, Channel: {5}"
 	).format(
-		response.get("record_count", 0),
+		record_count,
+		change_count,
+		deleted_count,
 		skipped_count,
 		delivery_status,
 		delivery_channel,
