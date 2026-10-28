@@ -31,8 +31,8 @@ def _make_source(**kwargs):
 # strip_modified filter tests
 # ---------------------------------------------------------------------------
 
-class TestStripModifiedFilters(FrappeTestCase):
 
+class TestStripModifiedFilters(FrappeTestCase):
 	def test_strips_modified_from_dict(self):
 		src = _make_source(
 			export_filters_json=json.dumps({"custom_is_published": 1, "modified": [">", "2026-01-01"]})
@@ -43,9 +43,7 @@ class TestStripModifiedFilters(FrappeTestCase):
 
 	def test_strips_modified_from_list_format(self):
 		src = _make_source(
-			export_filters_json=json.dumps(
-				[["custom_is_published", "=", 1], ["modified", ">", "2026-01-01"]]
-			)
+			export_filters_json=json.dumps([["custom_is_published", "=", 1], ["modified", ">", "2026-01-01"]])
 		)
 		result = _get_configured_export_filters(src, strip_modified=True)
 		field_names = [row[0] for row in result if isinstance(row, list)]
@@ -76,8 +74,8 @@ class TestStripModifiedFilters(FrappeTestCase):
 # _persist_portal_listings_state tests
 # ---------------------------------------------------------------------------
 
-class TestPersistPortalListings(FrappeTestCase):
 
+class TestPersistPortalListings(FrappeTestCase):
 	def tearDown(self):
 		for suffix in ["PROP-A", "PROP-B", "PROP-C", "PROP-GONE"]:
 			_cleanup(f"{_SRC}-{suffix}")
@@ -127,15 +125,21 @@ class TestPersistPortalListings(FrappeTestCase):
 # Delivery failure guard — Portal Listing must NOT be persisted on FTP failure
 # ---------------------------------------------------------------------------
 
-class TestDeliveryFailureGuard(FrappeTestCase):
 
+class TestDeliveryFailureGuard(FrappeTestCase):
 	@patch("openimmo_propms.services.export_engine._persist_portal_listings_state")
 	@patch("openimmo_propms.services.export_engine._deliver_export")
 	@patch("openimmo_propms.services.export_engine._create_export_job")
 	@patch("openimmo_propms.services.export_engine._build_export_documents")
 	@patch("openimmo_propms.services.export_engine.validate_xml_against_xsd", return_value=(True, ""))
-	@patch("openimmo_propms.services.export_engine.generate_xsd_based_xml", return_value="<?xml version='1.0'?><openimmo/>")
-	@patch("openimmo_propms.services.export_engine.build_property_data", return_value={"verwaltung_techn.openimmo_obid": "OBID-1"})
+	@patch(
+		"openimmo_propms.services.export_engine.generate_xsd_based_xml",
+		return_value="<?xml version='1.0'?><openimmo/>",
+	)
+	@patch(
+		"openimmo_propms.services.export_engine.build_property_data",
+		return_value={"verwaltung_techn.openimmo_obid": "OBID-1"},
+	)
 	@patch("openimmo_propms.services.export_engine._validate_export_source")
 	@patch("openimmo_propms.services.export_engine.evaluate_quality_gate_for_export")
 	@patch("openimmo_propms.services.export_engine._get_records_for_export")
@@ -153,6 +157,7 @@ class TestDeliveryFailureGuard(FrappeTestCase):
 		mock_persist,
 	):
 		import frappe as _frappe
+
 		from openimmo_propms.services.export_engine import run_export
 
 		source = frappe._dict(

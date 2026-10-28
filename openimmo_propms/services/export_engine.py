@@ -51,14 +51,16 @@ def run_export(source_name, **kwargs):
 			target_prop_names = {r["name"] for r in records}
 
 			last_sync_at = source.last_sync_at
-			# change = {T where modified > last_sync_at} ∪ (T - O)
+			# change = {T where modified > last_sync_at} union (T - O)
 			change_records = []
 			for r in records:
 				if r["name"] not in online_prop_names:
 					change_records.append(r)
 				elif not last_sync_at:
 					change_records.append(r)
-				elif r.get("modified") and frappe.utils.get_datetime(r["modified"]) > frappe.utils.get_datetime(last_sync_at):
+				elif r.get("modified") and frappe.utils.get_datetime(
+					r["modified"]
+				) > frappe.utils.get_datetime(last_sync_at):
 					change_records.append(r)
 
 			# delete = O - T
@@ -89,18 +91,22 @@ def run_export(source_name, **kwargs):
 				mapped["verwaltung_techn.aktion"] = "CHANGE"
 				mapped["verwaltung_techn.aktion@aktionart"] = "CHANGE"
 				if not mapped.get("verwaltung_techn.openimmo_obid"):
-					mapped["verwaltung_techn.openimmo_obid"] = mapped.get("objektnr_intern", record.get("name"))
+					mapped["verwaltung_techn.openimmo_obid"] = mapped.get(
+						"objektnr_intern", record.get("name")
+					)
 				mapped_records.append(mapped)
 				active_records_to_sync.append((record["name"], mapped["verwaltung_techn.openimmo_obid"]))
 
 			# Build minimal records for deletes
 			delete_records_data = []
 			for l in delete_listings:
-				del_doc = frappe._dict({
-					"name": l["property"],
-					"custom_property_name": l["property"],
-					"modified": frappe.utils.now_datetime(),
-				})
+				del_doc = frappe._dict(
+					{
+						"name": l["property"],
+						"custom_property_name": l["property"],
+						"modified": frappe.utils.now_datetime(),
+					}
+				)
 				delete_records_data.append(del_doc)
 				del_mapped = {
 					"__action__": "DELETE",
@@ -147,7 +153,10 @@ def run_export(source_name, **kwargs):
 
 			export_all_records = records
 			deleted_count = 0
-			active_records_to_sync = [(r["name"], mapped["verwaltung_techn.openimmo_obid"]) for r, mapped in zip(records, mapped_records, strict=False)]
+			active_records_to_sync = [
+				(r["name"], mapped["verwaltung_techn.openimmo_obid"])
+				for r, mapped in zip(records, mapped_records, strict=False)
+			]
 			deleted_to_sync = []
 
 		anbieter_id = kwargs.get("anbieter_id") or source.anbieter_id
@@ -189,7 +198,9 @@ def run_export(source_name, **kwargs):
 				}
 			]
 		else:
-			documents = _build_export_documents(source, list(zip(export_all_records, mapped_records, strict=False)), kwargs)
+			documents = _build_export_documents(
+				source, list(zip(export_all_records, mapped_records, strict=False)), kwargs
+			)
 			for doc_item in documents:
 				doc_item["deleted_records"] = deleted_count
 
@@ -269,7 +280,9 @@ def run_export(source_name, **kwargs):
 		raise e
 
 
-def _persist_portal_listings_state(source_name, target_doctype, active_records, deleted_records, job_name, run_started):
+def _persist_portal_listings_state(
+	source_name, target_doctype, active_records, deleted_records, job_name, run_started
+):
 	"""Upsert Portal Listing records after successful export delivery."""
 	for prop_name, obid in active_records:
 		listing_name = f"{source_name}-{prop_name}"
@@ -286,21 +299,23 @@ def _persist_portal_listings_state(source_name, target_doctype, active_records, 
 				},
 			)
 		else:
-			doc = frappe.get_doc({
-				"doctype": "Portal Listing",
-				"source": source_name,
-				"property_doctype": target_doctype,
-				"property": prop_name,
-				"obid": obid,
-				"state": "Online",
-				"last_action": "CHANGE",
-				"last_sent_at": run_started,
-				"last_job": job_name,
-			})
+			doc = frappe.get_doc(
+				{
+					"doctype": "Portal Listing",
+					"source": source_name,
+					"property_doctype": target_doctype,
+					"property": prop_name,
+					"obid": obid,
+					"state": "Online",
+					"last_action": "CHANGE",
+					"last_sent_at": run_started,
+					"last_job": job_name,
+				}
+			)
 			doc.flags.ignore_links = True
 			doc.insert(ignore_permissions=True)
 
-	for prop_name, obid in deleted_records:
+	for prop_name, _obid in deleted_records:
 		listing_name = f"{source_name}-{prop_name}"
 		if frappe.db.exists("Portal Listing", listing_name):
 			frappe.db.set_value(
@@ -614,8 +629,14 @@ def _get_configured_export_filters(source, strip_modified=False):
 			res = {k: v for k, v in res.items() if not (isinstance(k, str) and "modified" in k.lower())}
 		elif isinstance(res, list):
 			res = [
-				item for item in res
-				if not (isinstance(item, (list, tuple)) and len(item) >= 1 and isinstance(item[0], str) and "modified" in item[0].lower())
+				item
+				for item in res
+				if not (
+					isinstance(item, (list, tuple))
+					and len(item) >= 1
+					and isinstance(item[0], str)
+					and "modified" in item[0].lower()
+				)
 			]
 	return res
 

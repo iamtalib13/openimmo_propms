@@ -98,7 +98,9 @@ class XSDDrivenBuilder:
 
 		# verwaltung_techn
 		verwaltung_techn = etree.SubElement(immobilie_node, "verwaltung_techn")
-		obid = prop_data.get("verwaltung_techn.openimmo_obid") or prop_data.get("objektnr_intern") or "NO-OBID"
+		obid = (
+			prop_data.get("verwaltung_techn.openimmo_obid") or prop_data.get("objektnr_intern") or "NO-OBID"
+		)
 		objektnr_extern = etree.SubElement(verwaltung_techn, "objektnr_extern")
 		objektnr_extern.text = obid
 		etree.SubElement(verwaltung_techn, "aktion", aktionart="DELETE")
@@ -106,6 +108,7 @@ class XSDDrivenBuilder:
 		openimmo_obid.text = obid
 		stand_vom = etree.SubElement(verwaltung_techn, "stand_vom")
 		from frappe.utils import nowdate
+
 		stand_vom.text = nowdate()
 
 	def _build_uebertragung(self, root, portal_name, transfer_scope, transfer_mode, version):
